@@ -86,7 +86,7 @@ def _calc_sediment_rate_of_change(
             dHdt_by_class[i, c] = porosity_factor * (
                 (sed_influxes[i, c] - sed_outfluxes[i, c])
                 / area_of_cell
-                + (pluck_rate[c] * pluck_coarse_frac[i,c])
+                + (pluck_rate[c] * fractions_from_plucking[i,c])
                 - sed_abr_rates[i, c]
             )
             dHdt[c] += dHdt_by_class[i, c]
