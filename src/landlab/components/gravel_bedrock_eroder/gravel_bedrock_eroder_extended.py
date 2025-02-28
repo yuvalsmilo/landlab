@@ -545,7 +545,7 @@ class GravelBedrockEroder(Component):
                              self._rho_water)
         self._fixed_width_coeff = fixed_width_coeff
         self._fixed_width_expt = fixed_width_expt
-
+        self._calc_weight_threshold_to_deliv()
         self._fixed_width_flag = fixed_width_flag
 
         # Pointers to field
@@ -736,7 +736,7 @@ class GravelBedrockEroder(Component):
         median_size_at_node = self._grid.at_node['median_size__weight'][:, np.newaxis]
         tau_star_c = self._tau_star_c
         tau_star_c[:] = np.inf
-        tau_star_c[self.grid.core_nodes, :] = self._beta * np.divide(
+        tau_star_c[self.grid.core_nodes, :] = self._tau_star_c_median * np.divide(
             fractions_sizes[self.grid.core_nodes, :],
             median_size_at_node[self.grid.core_nodes]) ** self._alpha
 
@@ -801,6 +801,13 @@ class GravelBedrockEroder(Component):
                 * self._flow_link_length_over_cell_area
             )
 
+    def _calc_tau_star(self):
+        """Calculate tau star at node"""
+
+        self._tau_star = np.divide(self._tau[:, np.newaxis],
+                                   ((self._SG * self._w_density) *
+                                    self._g_star *
+                                    self._grid.at_node['grains_classes__size']))
     def calc_transport_rate(self):
         """Calculate and return bed-load transport rate.
 
@@ -821,45 +828,36 @@ class GravelBedrockEroder(Component):
                                        width=self._channel_width,
                                        slope=self._slope)
 
-        self._tau_star = np.divide(self._tau[:, np.newaxis],
-                                   ((self._SG * self._w_density) *
-                                    self._g_star *
-                                    self._grid.at_node['grains_classes__size']))
-
+        self._calc_tau_star()
         self._calc_tau_star_c()
 
-        excess_stress  = self._tau_star - self._tau_star_c
-        excess_stress[excess_stress<0] = 0
+        excess_stress = self._tau_star - self._tau_star_c
+        excess_stress[excess_stress < 0] = 0
 
-        qs = (3.97 * self._SG**(0.5) *
-              self._g_star**(0.5) *
-              (excess_stress)**(3/2) *
-              self._grid.at_node['grains_classes__size']**(3/2)) ## equation 3 in wickert
-
+        # Get sediment flux
+        qs = _calc_qs(excess_stress=excess_stress)
         Qs = self._channel_width[:,np.newaxis] * qs
         self._sed_outfluxes[:] = Qs*(1.0 - self._rock_exposure_fraction[:,np.newaxis])
-        grain_weight_at_node = self._grid.at_node['grains__weight']
-        self._sed_outfluxes[grain_weight_at_node<=self._weight_threshold_to_deliv] = 0
+        self._sed_outfluxes[self._grid.at_node['grains__weight']<=self._weight_threshold_to_deliv] = 0
         self._sediment_outflux[:] = np.sum(self._sed_outfluxes, axis=0)
 
-        # grain_volume_at_node = grain_weight_at_node / (self._s_density * (1-self._sediment_porosity))
-        # row,col = np.where(
-        #     self.grid.at_node['median_size__weight'][:, np.newaxis] == self._grid.at_node['grains_classes__size'])
-        # tau_star_c= np.copy(self._tau_star_c[row,col])
-        # tau_star_c[tau_star_c==np.inf] =0
-        #
-        # self._h = np.zeros_like(self._discharge)
-        # self._h[self._grid.core_nodes] = (self._SG *
-        #                                   (1 + self._epsilon) *
-        #                                   tau_star_c *
-        #                                   np.divide(
-        #                                       self.grid.at_node['median_size__weight'][self._grid.core_nodes],
-        #                                       self._slope[self._grid.core_nodes],
-        #                                       where= self._slope[self._grid.core_nodes]!=0,
-        #                                       out=np.zeros_like(self.grid.at_node['median_size__weight'][self._grid.core_nodes])))
-        #
-        # self._tau = self._w_density *  self._g_star * self._h * self._slope
+    def _calc_qs(self,
+                 excess_stress,
+                 out = None):
 
+        if out is None:
+            out = np.empty_like(self._grid.at_node['grains_classes__size'])
+
+        out[:] = (3.97 * self._SG ** (0.5) *
+              self._g_star ** (0.5) *
+              (excess_stress) ** (1.5) *
+              self._grid.at_node['grains_classes__size'] ** (1.5))
+    
+    def _calc_weight_threshold_to_deliv(self):
+        """Calc minimal weight threshold to deliver"""
+        d_max = np.max(self._grid.at_node['grains_classes__size'])
+        self._weight_threshold_to_deliv = d_max * self._grid.dx * self._grid.dx * self._rho_sed * self._porosity_factor
+    
     def calc_bedrock_plucking_rate(self):
         """Update the rate of bedrock erosion by plucking.
 
@@ -1274,7 +1272,7 @@ class GravelBedrockEroder(Component):
             #     self.grid.at_node['median_size__weight'][:, np.newaxis] == self._grid.at_node['grains_classes__size'])
             # tau_star_c_median = self._tau_star_c[row, col]
 
-            tau_star_c_median = self._beta
+            tau_star_c_median = self._tau_star_c_median
             median_size = self.grid.at_node['median_size__weight']
             slope = self._slope
             g_star = self._g_star
