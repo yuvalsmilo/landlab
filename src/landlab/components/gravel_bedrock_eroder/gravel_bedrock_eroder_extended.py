@@ -908,23 +908,16 @@ class GravelBedrockEroder(Component):
         (1) Total flux in the field ``bedload_sediment__volume_influx``
         (2) Per size class in the _sed_influxes array
         """
-        if use_cfuncs:
-            _calc_sediment_influx(
-                self._num_sed_classes,
-                self.grid.number_of_core_nodes,
-                self._sediment_influx,
-                self._sed_influxes,
-                self._sediment_outflux,
-                self._sed_outfluxes,
-                self.grid.core_nodes,
-                self._receiver_node,
-            )
-        else:
-            self._sed_influxes[:, :] = 0.0
-            for c in self.grid.core_nodes:  # send sediment downstream
-                r = self._receiver_node[c]
-                for i in range(self._num_sed_classes):
-                    self._sed_influxes[i, r] += self._sed_outfluxes[i, c]
+        _calc_sediment_influx(
+            self._num_sed_classes,
+            self.grid.number_of_core_nodes,
+            self._sediment_influx,
+            self._sed_influxes,
+            self._sediment_outflux,
+            self._sed_outfluxes,
+            self.grid.core_nodes,
+            self._receiver_node,
+        )
 
     def calc_sediment_rate_of_change(self):
         """
@@ -999,7 +992,7 @@ class GravelBedrockEroder(Component):
                 self._porosity_factor,
                 self.grid.area_of_cell[0],
                 self.grid.core_nodes,
-                self._pluck_coarse_frac_per_size,
+                self._fractions_from_plucking,
                 self._dHdt,
                 self._pluck_rate,
                 self._dHdt_by_class,
