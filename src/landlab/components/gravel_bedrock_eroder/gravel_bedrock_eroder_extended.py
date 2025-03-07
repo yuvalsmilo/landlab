@@ -9,12 +9,11 @@ import numpy as np
 from landlab import Component
 from landlab import HexModelGrid
 from landlab.grid.diagonals import DiagonalsMixIn
-
-use_cfuncs = False
-if use_cfuncs:
-    from .cfuncs import _calc_sediment_influx
-    from .cfuncs import _calc_sediment_rate_of_change
-    from .cfuncs import _estimate_max_time_step_size_ext
+from cfuncs import _calc_sediment_influx
+from cfuncs import _calc_sediment_rate_of_change
+from cfuncs import _estimate_max_time_step_size_ext
+from cfuncs import _calc_sed_abrs_rate
+from cfuncs import _calc_bedrock_abrs_rate
 
 _DT_MAX = 1.0e-2
 _ONE_SIXTH = 1.0 / 6.0
@@ -500,6 +499,7 @@ class GravelBedrockEroder(Component):
             sediment_porosity=0.35,
             depth_decay_scale=1.0,
             plucking_coefficient=1.0e-4,
+            epsilon=0.2,  # from parker 1978
             abrasion_coefficients=0.0,
             bedrock_abrasion_coefficient=0.01,
             fractions_from_plucking=1.0,
@@ -531,15 +531,8 @@ class GravelBedrockEroder(Component):
         self._fractions_from_plucking = self._create_2D_array_for_input_var(
             fractions_from_plucking,
             'fractions_from_plucking')
-        if ~np.all(np.sum(self._fractions_from_plucking, 1) == 1):
-            raise ValueError("The sum of fractions from plucking should be equal to 1")
-        self._plucking_coef = self._create_2D_array_for_input_var(
-            plucking_coefficient,
-            'plucking_coefficient')
-        self._br_abr_coef = self._create_2D_array_for_input_var(
-            bedrock_abrasion_coefficient,
-            'bedrock_abrasion_coefficient')
-
+        # if ~np.all(np.sum(self._fractions_from_plucking, 1) == 1):
+        #     raise ValueError("The sum of fractions from plucking should be equal to 1")
         # Recognize whether the component deals with lithologies or grain sizes
         self._get_classes_identity()
 
@@ -564,7 +557,7 @@ class GravelBedrockEroder(Component):
         self._calc_gravity_coefficient_star()
         self._tau_star_c_median = tau_star_c_median
         self._alpha = alpha
-
+        self._epsilon =  epsilon
         # Pointers to field
         self._elev = grid.at_node["topographic__elevation"]
         self._sed = grid.at_node["soil__depth"]
@@ -591,6 +584,27 @@ class GravelBedrockEroder(Component):
         # 1D arrays in dimensions of n_nodes
         self._implied_width = np.zeros_like(self.grid.nodes.flatten())
         self._channel_width = np.zeros_like(self.grid.nodes.flatten())
+        self._plucking_coef = np.zeros_like(self.grid.nodes.flatten())
+
+        if isinstance(plucking_coefficient, float) or isinstance(plucking_coefficient, int):
+            self._plucking_coef[:]=plucking_coefficient
+        elif isinstance(plucking_coefficient, np.ndarray) or isinstance(plucking_coefficient, list):
+            try:
+                self._plucking_coef[:] = plucking_coefficient
+            except:
+                print("Plucking coefficient array dont match the number of nodes")
+        else:
+            print("Plucking coefficient format is not valid")
+        self._br_abr_coef = np.zeros_like(self.grid.nodes.flatten(),dtype=float)
+        if isinstance(bedrock_abrasion_coefficient, float) or isinstance(bedrock_abrasion_coefficient, int):
+            self._br_abr_coef[:]=plucking_coefficient
+        elif isinstance(bedrock_abrasion_coefficient, np.ndarray) or isinstance(bedrock_abrasion_coefficient, list):
+            try:
+                self._br_abr_coef[:] = bedrock_abrasion_coefficient
+            except:
+                print("Bedrock abrasion coefficient array dont match the number of nodes")
+        else:
+            print("Bedrock abrasion coefficient format is not valid")
         # 2D arrays in dimensions of n_nodes x n_classes
         self._thickness_by_class = np.zeros(
             (grid.number_of_nodes, self._n_classes)
@@ -633,8 +647,8 @@ class GravelBedrockEroder(Component):
                 isinstance(input_var, int) or
                 isinstance(input_var, float)
         ):
-            input_var_array = np.zeros_like(self._grid.nodes.flatten())[:, np.newaxis]
-            input_var_array[:, 0] = input_var
+            input_var_array = np.zeros((np.size(self._grid.nodes.flatten()),self._n_classes))
+            input_var_array[:, :] = input_var
         elif np.ndim(input_var) <= 1:
             if isinstance(input_var, list):
                 input_var = np.array(input_var)
@@ -669,14 +683,11 @@ class GravelBedrockEroder(Component):
         """""
 
         self._classes_identity = 0
-        if np.shape(self._abr_coefs)[1] > 1:
-            # If multiple abrasion coefficients are given -> the classes represent lithology
+        is_multi_abrasion = np.size(np.unique(self._abr_coefs))>1
+        if is_multi_abrasion:
             self._classes_identity = 1
-
-        else:
-            # If multiple fractions_from_plucking are given -> the classes represent grain sizes
+        elif self._n_classes>1:
             self._classes_identity = 2
-            # np.shape(self._fractions_from_plucking)[1] > 1:
 
     def _calc_gravity_coefficient_star(self):
         self._g_star = (_EARTH_GRAV *
@@ -811,14 +822,51 @@ class GravelBedrockEroder(Component):
         >>> eroder._sed_abr_rates[:, 4]
         array([ 6.34350474e-07, 6.34350474e-08, 6.34350474e-09])
         """
-        cores = self._grid.core_nodes
-        for i in range(self._num_sed_classes):
-            self._sed_abr_rates[i, cores] = (
-                    self._abr_coefs[i]
-                    * 0.5
-                    * (self._sed_outfluxes[i, cores] + self._sed_influxes[i, cores])
-                    * self._flow_link_length_over_cell_area
-            )
+
+        num_sed_classes = self._n_classes
+        num_core_nodes = np.size(self._grid.core_nodes)
+        flow_link_length_over_cell_area = self._flow_link_length_over_cell_area
+        core_nodes = self._grid.core_nodes
+        sed_abr_rates = self._sed_abr_rates
+        sed_abr_coeff = self._abr_coefs
+        sed_influxes = self._sed_influxes
+        sed_outfluxes = self._sed_outfluxes
+        _calc_sed_abrs_rate(num_sed_classes,
+                            num_core_nodes,
+                            flow_link_length_over_cell_area,
+                            core_nodes,
+                            sed_abr_rates,
+                            sed_abr_coeff,
+                            sed_influxes,
+                            sed_outfluxes)
+
+    def calc_bedrock_abrasion_rate(self):
+        """Update the rate of bedrock abrasion.
+
+        Note: assumes _abrasion (of sediment) and _rock_exposure_fraction
+        have already been updated. Like _abrasion, the rate is a length
+        per time (equivalent to rate of lowering of the bedrock surface by
+        abrasion). Result is stored in the field ``bedrock__abrasion_rate``.
+        """
+        num_sed_classes = self._n_classes
+        num_core_nodes = np.size(self._grid.core_nodes)
+        flow_link_length_over_cell_area = self._flow_link_length_over_cell_area
+        rock_exposure_fraction = self._rock_exposure_fraction
+        core_nodes = self._grid.core_nodes
+        bedrock_abrasion_rate = self._rock_abrasion_rate
+        bedrock_abr_coeff = self._br_abr_coef
+        sed_influxes = self._sed_influxes
+        sed_outfluxes = self._sed_outfluxes
+        _calc_bedrock_abrs_rate(num_sed_classes,
+                            num_core_nodes,
+                            flow_link_length_over_cell_area,
+                            rock_exposure_fraction,
+                            core_nodes,
+                            bedrock_abrasion_rate,
+                            bedrock_abr_coeff,
+                            sed_influxes,
+                            sed_outfluxes)
+
 
     def _calc_tau_star(self):
         """Calculate tau star at node"""
@@ -906,13 +954,14 @@ class GravelBedrockEroder(Component):
         >>> int(round(eroder._pluck_rate[4] * 1e9))
         464
         """
+        self._beta_plucking=1
         cores = self._grid.core_nodes
         self._pluck_rate[cores] = np.divide((
-                self._plucking_coef
+                self._plucking_coef[cores]
                 * self._intermittency_factor
-                * self._new_width[cores]
+                * self._channel_width[cores]
                 * self._epsilon
-                * self._beta
+                * self._beta_plucking
                 * self._discharge[cores]
                 * self._slope[cores] ** _SEVEN_SIXTHS
                 * self._rock_exposure_fraction[cores]
@@ -928,7 +977,7 @@ class GravelBedrockEroder(Component):
         (2) Per size class in the _sed_influxes array
         """
         _calc_sediment_influx(
-            self._num_sed_classes,
+            self._n_classes,
             self.grid.number_of_core_nodes,
             self._sediment_influx,
             self._sed_influxes,
@@ -1004,7 +1053,7 @@ class GravelBedrockEroder(Component):
         """
 
         _calc_sediment_rate_of_change(
-            self._num_sed_classes,
+            self._n_classes,
             self.grid.number_of_core_nodes,
             self._porosity_factor,
             self.grid.area_of_cell[0],
@@ -1180,7 +1229,7 @@ class GravelBedrockEroder(Component):
 
         # Update grains weight based on fluxes
         weight_dt_by_class = (self._dHdt_by_class *
-                              self._s_density * self._grid.dx ** 2 *
+                              self._rho_sed * self._grid.dx ** 2 *
                               (1 - self._sediment_porosity) * dt)
 
         weights_at_node[:] += weight_dt_by_class
@@ -1188,7 +1237,7 @@ class GravelBedrockEroder(Component):
 
         # Update sediment thickness (sum of all grain size classes)
         self._sed[self.grid.core_nodes] = np.sum(self._grid.at_node['grains__weight'][self.grid.core_nodes], axis=1) / (
-                self._s_density * self._grid.dx ** 2 * (1 - self._sediment_porosity))
+                self._rho_sed * self._grid.dx ** 2 * (1 - self._sediment_porosity))
 
         # Update bedrock lowering
         self._bedrock__elevation[self.grid.core_nodes] -= self._rock_lowering_rate[self.grid.core_nodes] * dt
@@ -1223,45 +1272,45 @@ class GravelBedrockEroder(Component):
         dt : float (default 1.0e6)
             Maximum time step size
         """
-        if use_cfuncs:
-            min_dt = _estimate_max_time_step_size_ext(
-                upper_limit_dt,
-                self.grid.number_of_nodes,
-                self._sed,
-                self._elev,
-                self._dHdt,
-                self._dHdt - self._rock_lowering_rate,
-                self._receiver_node,
+        # if use_cfuncs:
+        #     min_dt = _estimate_max_time_step_size_ext(
+        #         upper_limit_dt,
+        #         self.grid.number_of_nodes,
+        #         self._sed,
+        #         self._elev,
+        #         self._dHdt,
+        #         self._dHdt - self._rock_lowering_rate,
+        #         self._receiver_node,
+        #     )
+        # else:
+        # Make sure mass of grain size class is not reducing below zero.
+        dhdt_by_class = self._dHdt_by_class
+        dh_by_class = (self._grid.at_node['grains__weight'] /
+                       (self._rho_sed * (
+                               1 - self._sediment_porosity) * self._grid.dx ** 2))
+
+        sed_is_declining = np.logical_and(dhdt_by_class < 0.0, dh_by_class > 0.0)
+        if np.any(sed_is_declining):
+            min_time_to_exhaust_sed = np.amin(
+                dh_by_class[sed_is_declining] / np.abs(dhdt_by_class[sed_is_declining])
             )
         else:
-            # Make sure mass of grain size class is not reducing below zero.
-            dhdt_by_class = self._dHdt_by_class
-            dh_by_class = (self._grid.at_node['grains__weight'] /
-                           (self._s_density * (
-                                   1 - self._sediment_porosity) * self._grid.dx ** 2))
+            min_time_to_exhaust_sed = upper_limit_dt
 
-            sed_is_declining = np.logical_and(dhdt_by_class < 0.0, dh_by_class > 0.0)
-            if np.any(sed_is_declining):
-                min_time_to_exhaust_sed = np.amin(
-                    dh_by_class[sed_is_declining] / np.abs(dhdt_by_class[sed_is_declining])
-                )
-            else:
-                min_time_to_exhaust_sed = upper_limit_dt
-
-            dzdt = self._dHdt - self._rock_lowering_rate
-            rate_diff = dzdt[self._receiver_node] - dzdt
-            height_above_rcvr = self._elev - self._elev[self._receiver_node]
-            slope_is_declining = np.logical_and(
-                rate_diff > 0.0, height_above_rcvr > 0.0
+        dzdt = self._dHdt - self._rock_lowering_rate
+        rate_diff = dzdt[self._receiver_node] - dzdt
+        height_above_rcvr = self._elev - self._elev[self._receiver_node]
+        slope_is_declining = np.logical_and(
+            rate_diff > 0.0, height_above_rcvr > 0.0
+        )
+        if np.any(slope_is_declining):
+            min_time_to_flatten_slope = np.amin(
+                height_above_rcvr[slope_is_declining]
+                / rate_diff[slope_is_declining]
             )
-            if np.any(slope_is_declining):
-                min_time_to_flatten_slope = np.amin(
-                    height_above_rcvr[slope_is_declining]
-                    / rate_diff[slope_is_declining]
-                )
-            else:
-                min_time_to_flatten_slope = upper_limit_dt
-            min_dt = 0.5 * min(min_time_to_exhaust_sed, min_time_to_flatten_slope)
+        else:
+            min_time_to_flatten_slope = upper_limit_dt
+        min_dt = 0.5 * min(min_time_to_exhaust_sed, min_time_to_flatten_slope)
 
         return min_dt
 
@@ -1310,3 +1359,13 @@ class GravelBedrockEroder(Component):
             this_dt = max(this_dt, _DT_MAX)
             self._update_rock_sed_and_elev(this_dt)
             time_remaining -= this_dt
+
+
+
+
+
+
+
+
+
+

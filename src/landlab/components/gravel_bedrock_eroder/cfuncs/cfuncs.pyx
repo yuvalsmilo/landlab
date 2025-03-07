@@ -90,3 +90,54 @@ def _calc_sediment_rate_of_change(
                 - sed_abr_rates[i, c]
             )
             dHdt[c] += dHdt_by_class[i, c]
+
+
+@cython.boundscheck(False)
+def _calc_sed_abrs_rate(
+    DTYPE_INT_t num_sed_classes,
+    DTYPE_INT_t num_core_nodes,
+    DTYPE_t flow_link_length_over_cell_area,
+    np.ndarray[DTYPE_INT_t, ndim=1] core_nodes,
+    np.ndarray[DTYPE_t, ndim=2] sed_abr_rates,
+    np.ndarray[DTYPE_t, ndim=2] sed_abr_coeff,
+    np.ndarray[DTYPE_t, ndim=2] sed_influxes,
+    np.ndarray[DTYPE_t, ndim=2] sed_outfluxes,
+):
+    cdef int c, i
+    cdef float flow_link_length
+    flow_link_length=flow_link_length_over_cell_area
+
+    for j in range(num_core_nodes):
+        c = core_nodes[j]
+        for i in range(num_sed_classes):
+            sed_abr_rates[c,i] = (sed_abr_coeff[c,i] *
+                                  0.5 *
+                                  (sed_outfluxes[c,i] + sed_influxes[c,i]) *
+                                  flow_link_length)
+
+
+
+@cython.boundscheck(False)
+def _calc_bedrock_abrs_rate(
+    DTYPE_INT_t num_sed_classes,
+    DTYPE_INT_t num_core_nodes,
+    DTYPE_t flow_link_length_over_cell_area,
+    np.ndarray[DTYPE_t, ndim=1] rock_exposure_fraction,
+    np.ndarray[DTYPE_INT_t, ndim=1] core_nodes,
+    np.ndarray[DTYPE_t, ndim=1] bedrock_abr_rates,
+    np.ndarray[DTYPE_t, ndim=1] bedrock_abr_coeff,
+    np.ndarray[DTYPE_t, ndim=2] sed_influxes,
+    np.ndarray[DTYPE_t, ndim=2] sed_outfluxes,
+):
+    cdef int c, i
+    cdef float flow_link_length
+    flow_link_length = flow_link_length_over_cell_area
+    for j in range(num_core_nodes):
+        c = core_nodes[j]
+        for i in range(num_sed_classes):
+            bedrock_abr_rates[c] = (bedrock_abr_rates[c] +
+                                    (bedrock_abr_coeff[c] *
+                                     0.5 *
+                                     rock_exposure_fraction[c] *
+                                     (sed_outfluxes[c,i] + sed_influxes[c,i]) *
+                                     flow_link_length))
