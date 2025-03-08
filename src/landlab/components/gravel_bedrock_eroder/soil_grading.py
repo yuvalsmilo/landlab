@@ -456,11 +456,14 @@ class SoilGrading(Component):
             + self._grid.at_node["bedrock__elevation"]
         )
 
-    def _generate_normal_distribution(self, median_size=None, total_soil_weight=None):
+    def _generate_normal_distribution(self,
+                                      median_size=None,
+                                      total_soil_weight=None,
+                                      std=None):
 
         if median_size is None:
             median_size = self._initial_median_size
-        if self._std is None:
+        if std is None:
             self._std = self._CV * median_size
         if total_soil_weight is None:
             total_soil_weight = self._initial_total_soil_weight
@@ -493,7 +496,9 @@ class SoilGrading(Component):
                 if sample >= lower and sample <= upper:
                     values.append(sample)
 
-            grains_weight__distribution = np.histogram(values, np.append(self._limits[:,0],np.max(self._limits)))
+            grains_weight__distribution = np.histogram(values,
+                                                       np.append(self._limits[:,0],
+                                                                         np.max(self._limits)))
 
         return grains_weight__distribution[0]
 
@@ -587,11 +592,12 @@ class SoilGrading(Component):
                                        proportions=None):
 
         if proportions is None:
-            proportions = np.divide(self._grid.at_node['grains__weight'],
-                                    np.sum(self._grid.at_node['grains__weight'],1)[:,np.newaxis],
-                                    where=self._grid.at_node['grains__weight']>0)
+            proportions = np.divide(self.g_state0,
+                                    np.sum(self.g_state0,1)[:,np.newaxis],
+                                    where=self.g_state0>0)
         else:
-            proportions = self._create_2D_array_for_input_var(proportions,'bed_grains_proportions')
+            proportions = self._create_2D_array_for_input_var(proportions,
+                                                              'bed_grains_proportions')
 
         try:
             self._grid.at_node["bed_grains__proportions"][:]=proportions
