@@ -194,22 +194,6 @@ class SoilGrading(Component):
                                                               'meansizes')
         self._n_sizes = np.size(self._meansizes,1)
 
-        # Limits
-        if limits is None:
-            self.set_grading_limits()
-        else:
-            if (
-                np.shape(self._limits)[0] != np.size(meansizes)
-                or np.shape(self._limits)[1] != 2
-            ):
-                raise ValueError("limits array must be in shape of meansizes x 2")
-            if (
-                np.all(self._limits[:, 1] > self._limits[:, 0])
-                * np.all(np.diff(self._limits[:, 1]) > 0)
-                * np.all(np.diff(self._limits[:, 0]) > 0)
-            ) is False:
-                raise ValueError("limits array must in ascending order")
-
         # Note: Landlabs' init_out_field procedure will not work
         # for the 'grains__weight' and 'grains_classes__size' fields
         # because the shape of these fields is: n_nodes x n_grain_sizes.
@@ -240,6 +224,8 @@ class SoilGrading(Component):
         # In case grains_weight not provided, the weights will be spread around
         # the initial_median_size assuming normal distribution
         if grains_weight is None:
+            if limits is None:
+                self.set_grading_limits()
             self._CV = CV
             if initial_median_size is None:
                 self._initial_median_size = self._meansizes[self._grid.core_nodes[0],int(self._n_sizes / 2)]
@@ -263,8 +249,8 @@ class SoilGrading(Component):
         # Check if the fragmentation pattern provided is valid
         self.check_fragmentation_pattern()
 
-        # Update sizes and distribution limits
         self._grid.at_node["grains_classes__size"] *= self._meansizes
+        self._check_match_weights_n_classes()
 
         # Transition matrix
         self.create_transition_mat()
@@ -398,11 +384,28 @@ class SoilGrading(Component):
                 cnt += 1
                 cnti -= 1
 
-    def set_grading_limits(self):
+    def set_grading_limits(self,
+                           limits=None):
 
-        self._limits = (self._meansizes[self._grid.core_nodes[0],:-1] + self._meansizes[self._grid.core_nodes[0],1:]) * 0.5
-        self._limits = np.insert(self._limits, 0, 0.0)
-        self._limits = np.concatenate((self._limits, [np.inf]))
+        if limits is None:
+            lowers = (self._meansizes[self._grid.core_nodes[0],:-1] + self._meansizes[self._grid.core_nodes[0],1:]) * 0.5
+            lowers = np.insert(lowers, 0, 0.0)
+            uppers = np.concatenate((lowers[1:], [np.inf]))
+            self._limits = np.empty((self._n_sizes, 2))
+            self._limits[:, 0]=lowers
+            self._limits[:, 1]=uppers
+
+        if (
+                np.shape(self._limits)[0] != self._n_sizes
+                or np.shape(self._limits)[1] != 2
+        ):
+            raise ValueError("limits array must be in shape of n_sizes x 2")
+        if (
+                np.all(self._limits[:, 1] > self._limits[:, 0])
+                * np.all(np.diff(self._limits[:, 1]) > 0)
+                * np.all(np.diff(self._limits[:, 0]) > 0)
+        ) is False:
+            raise ValueError("limits array must in ascending order")
 
     def generate_weight_distribution(
         self, median_size=None, is_bedrock_distribution_flag=False
@@ -440,7 +443,6 @@ class SoilGrading(Component):
             self.update_bed_grains_proportions(proportions=grains_weight__distribution)
     def _update_mass(self, grains_weight__distribution):
 
-        grains_weight__distribution=grains_weight__distribution
         self.g_state0 = grains_weight__distribution
         self._grid.at_node["grains__weight"][self._grid.core_nodes, :] = grains_weight__distribution[self._grid.core_nodes, :]
         layer_depth = np.sum(self._grid.at_node["grains__weight"][self._grid.core_nodes],1) / (
@@ -491,9 +493,9 @@ class SoilGrading(Component):
                 if sample >= lower and sample <= upper:
                     values.append(sample)
 
-            grains_weight__distribution = np.histogram(values, self._limits)[0]
+            grains_weight__distribution = np.histogram(values, np.append(self._limits[:,0],np.max(self._limits)))
 
-        return grains_weight__distribution
+        return grains_weight__distribution[0]
 
     def update_median_grain_size(self):
         """
@@ -597,4 +599,13 @@ class SoilGrading(Component):
         except:
             raise ValueError(
                 "Proportions array must be in shape of n_nodes x n_classes"
+            )
+
+    def _check_match_weights_n_classes(self):
+        """
+        """
+        if (np.shape(self._grid.at_node['grains__weight'])[1] !=
+            np.shape(self._grid.at_node["grains_classes__size"])[1]):
+            raise ValueError(
+                "Grain weights provided do not match the number of classes"
             )
