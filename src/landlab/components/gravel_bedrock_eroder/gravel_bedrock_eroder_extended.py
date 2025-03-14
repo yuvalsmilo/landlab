@@ -702,7 +702,7 @@ class GravelBedrockEroder(Component):
         >>> elev = grid.add_zeros("topographic__elevation", at="node")
         >>> sed_depth = 1000
         >>> porosity=0.5
-        >>> sed_weight = sed_depth * xy_spacing * xy_spacing * 2650 * (1-porosity)
+        >>> sed_weight = sed_depth * 2650 * (1-porosity) # weight per grid node area
         >>> grains_weight =[sed_weight, sed_weight, sed_weight]
         >>> grain_sizes = [0.001, 0.01, 0.05]
         >>> sg = SoilGrading(grid,
@@ -775,7 +775,7 @@ class GravelBedrockEroder(Component):
         >>> elev = grid.add_zeros("topographic__elevation", at="node")
         >>> sed_depth = 1000
         >>> porosity=0.5
-        >>> sed_weight = sed_depth * xy_spacing * xy_spacing * 2650 * (1-porosity)
+        >>> sed_weight = sed_depth * 2650 * (1-porosity)
         >>> grains_weight =[sed_weight, sed_weight, sed_weight]
         >>> grain_sizes = [0.001, 0.01, 0.05]
         >>> sg = SoilGrading(grid,
@@ -827,7 +827,7 @@ class GravelBedrockEroder(Component):
        >>> sed_depth = 3
        >>> porosity=0
        >>> rho_sed = 2650
-       >>> sed_weight = (sed_depth * xy_spacing * xy_spacing * rho_sed  * (1-porosity))/3
+       >>> sed_weight = (sed_depth * rho_sed  * (1-porosity))/3 # weight per node area
        >>> grains_weight =[sed_weight, sed_weight, sed_weight]
        >>> grain_sizes = [0.001, 0.01, 0.05]
        >>> sg = SoilGrading(grid,
@@ -842,9 +842,10 @@ class GravelBedrockEroder(Component):
        array([ 1.,  1.,  1.])
        """
 
+        # Grains weight is the weight per grid cell area
         self._thickness_by_class = np.divide(
             self._grid.at_node['grains__weight'],
-            (self._rho_sed * (1-self._sediment_porosity) * self._grid.dx * self._grid.dx)
+            (self._rho_sed * (1-self._sediment_porosity))
         )
 
     def _update_flow_link_length_over_cell_area(self):
@@ -1134,7 +1135,7 @@ class GravelBedrockEroder(Component):
     def _calc_weight_threshold_to_deliv(self):
         """Calc minimal weight threshold to deliver"""
         d_max = np.max(self._grid.at_node['grains_classes__size'])
-        self._weight_threshold_to_deliv = d_max * self._grid.dx * self._grid.dx * self._rho_sed * self._porosity_factor
+        self._weight_threshold_to_deliv = d_max * self._rho_sed * self._porosity_factor
 
     def calc_bedrock_plucking_rate(self):
         """Update the rate of bedrock erosion by plucking.
@@ -1433,7 +1434,7 @@ class GravelBedrockEroder(Component):
 
         # Update grains weight based on fluxes
         weight_dt_by_class = (self._dHdt_by_class *
-                              self._rho_sed * self._grid.dx ** 2 *
+                              self._rho_sed  *
                               (1 - self._sediment_porosity) * dt)
 
         weights_at_node[:] += weight_dt_by_class
@@ -1441,7 +1442,7 @@ class GravelBedrockEroder(Component):
 
         # Update sediment thickness (sum of all grain size classes)
         self._sed[self.grid.core_nodes] = np.sum(self._grid.at_node['grains__weight'][self.grid.core_nodes], axis=1) / (
-                self._rho_sed * self._grid.dx ** 2 * (1 - self._sediment_porosity))
+                self._rho_sed * (1 - self._sediment_porosity))
 
         # Update bedrock lowering
         self._bedrock__elevation[self.grid.core_nodes] -= self._rock_lowering_rate[self.grid.core_nodes] * dt
@@ -1479,7 +1480,7 @@ class GravelBedrockEroder(Component):
         dhdt_by_class = self._dHdt_by_class
         dh_by_class = (self._grid.at_node['grains__weight'] /
                        (self._rho_sed * (
-                               1 - self._sediment_porosity) * self._grid.dx ** 2))
+                               1 - self._sediment_porosity)))
 
         sed_is_declining = np.logical_and(dhdt_by_class < 0.0, dh_by_class > 0.0)
         if np.any(sed_is_declining):
@@ -1584,16 +1585,6 @@ class GravelBedrockEroder(Component):
             this_dt = max(this_dt, _DT_MAX)
             self._update_rock_sed_and_elev(this_dt)
             time_remaining -= this_dt
-
-
-
-
-if __name__ == '__main__':
-    import doctest
-    doctest.testmod(name='calc_rock_exposure_fraction')
-
-
-
 
 
 
