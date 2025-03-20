@@ -10,6 +10,10 @@ ctypedef np.int_t DTYPE_INT_t
 DTYPE = np.double
 ctypedef np.double_t DTYPE_t
 
+DTYPE_FLOAT = np.double
+DTYPE_complex = np.complexfloating
+ctypedef np.double_t DTYPE_FLOAT_t
+
 
 @cython.boundscheck(False)
 def _calc_sediment_influx(
@@ -32,7 +36,7 @@ def _calc_sediment_influx(
         if num_sed_classes > 1:
             sediment_influx[r] += sediment_outflux[c]
         for i in range(num_sed_classes):
-            sed_influxes[i, r] += sed_outfluxes[i, c]
+            sed_influxes[r, i ] += sed_outfluxes[c, i]
 
 @cython.boundscheck(False)
 def _estimate_max_time_step_size_ext(
@@ -83,13 +87,14 @@ def _calc_sediment_rate_of_change(
         c = core_nodes[j]
         dHdt[c] = 0.0
         for i in range(num_sed_classes):
-            dHdt_by_class[i, c] = porosity_factor * (
-                (sed_influxes[i, c] - sed_outfluxes[i, c])
+            dHdt_by_class[c, i] = porosity_factor * (
+                (sed_influxes[c, i ] - sed_outfluxes[c, i])
                 / area_of_cell
-                + (pluck_rate[c] * fractions_from_plucking[i,c])
-                - sed_abr_rates[i, c]
+                + (pluck_rate[c] * fractions_from_plucking[c, i])
+                - sed_abr_rates[c, i]
             )
-            dHdt[c] += dHdt_by_class[i, c]
+            dHdt[c] += dHdt_by_class[c, i]
+
 
 
 @cython.boundscheck(False)
@@ -141,3 +146,71 @@ def _calc_bedrock_abrs_rate(
                                      rock_exposure_fraction[c] *
                                      (sed_outfluxes[c,i] + sed_influxes[c,i]) *
                                      flow_link_length))
+
+
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _get_classes_fractions(
+        DTYPE_INT_t num_classes,
+        DTYPE_INT_t num_core_nodes,
+        np.ndarray[DTYPE_INT_t, ndim=1] core_nodes,
+        cython.floating[:, :] value_at_node_per_class,
+        cython.floating[:, :] out,
+):
+
+    cdef int col, row, node
+    cdef float sum_at_node
+
+    for row in prange(num_core_nodes, nogil=True, schedule="static",num_threads=32):
+        node = core_nodes[row]
+        sum_at_node = 0.0
+        for col in range(num_classes):
+            sum_at_node  = sum_at_node + value_at_node_per_class[node, col]
+        for col in range(num_classes):
+            if sum_at_node>0:
+                out[node,col] = value_at_node_per_class[node, col] / sum_at_node
+            else:
+                out[node, col] = 0
+
+    return out.base
+
+
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _calc_pluck_rate(
+        DTYPE_INT_t num_classes,
+        DTYPE_INT_t num_core_nodes,
+        intermittency_factor,
+        flow_link_length_over_cell_area,
+        np.ndarray[DTYPE_INT_t, ndim = 1] core_nodes,
+        cython.floating[:] plucking_coef,
+        cython.floating[:] channel_width,
+        cython.floating[:] rock_exposure_fraction,
+        cython.floating[:, :] classes_fractions,
+        cython.floating[:, :] excess_stress,
+        cython.floating[:] out,
+):
+
+
+    cdef int col, node, row
+    cdef float sum_at_node
+    cdef float intermittency_f
+    cdef float flow_length
+
+    intermittency_f=intermittency_factor
+    flow_length = flow_link_length_over_cell_area
+    for row in prange(num_core_nodes, nogil=True, schedule="static",num_threads=32):
+        node = core_nodes[row]
+        out[node] = 0.0
+        for col in range(num_classes):
+            out[node]  = out[node] + (intermittency_f*
+                                      plucking_coef[node]*
+                                      excess_stress[node,col]**1.5*
+                                      channel_width[node]*
+                                      flow_length*
+                                      rock_exposure_fraction[node]*classes_fractions[node,col])
+

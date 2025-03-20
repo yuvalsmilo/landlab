@@ -14,6 +14,8 @@ from cfuncs import _calc_sediment_rate_of_change
 from cfuncs import _estimate_max_time_step_size_ext
 from cfuncs import _calc_sed_abrs_rate
 from cfuncs import _calc_bedrock_abrs_rate
+from cfuncs import _get_classes_fractions
+from cfuncs import _calc_pluck_rate
 _DT_MAX = 1.0e-2
 _ONE_SIXTH = 1.0 / 6.0
 _SEVEN_SIXTHS = 7.0 / 6.0
@@ -635,9 +637,9 @@ class GravelBedrockEroder(Component):
         self._setup_length_of_flow_link()
 
         # 1D arrays in dimensions of n_nodes
-        self._implied_width = np.zeros_like(self.grid.nodes.flatten())
-        self._channel_width = np.zeros_like(self.grid.nodes.flatten())
-        self._plucking_coef = np.zeros_like(self.grid.nodes.flatten())
+        self._implied_width = np.zeros_like(self.grid.nodes.flatten()).astype(float)
+        self._channel_width = np.zeros_like(self.grid.nodes.flatten()).astype(float)
+        self._plucking_coef = np.zeros_like(self.grid.nodes.flatten()).astype(float)
         self._tau = np.zeros_like(self.grid.nodes.flatten())
 
         if isinstance(plucking_coefficient, float) or isinstance(plucking_coefficient, int):
@@ -679,6 +681,9 @@ class GravelBedrockEroder(Component):
             (grid.number_of_nodes, self._n_classes)
         )
         self._tau_star_c = np.zeros(
+            (grid.number_of_nodes, self._n_classes)
+        )
+        self._excess_stress = np.zeros(
             (grid.number_of_nodes, self._n_classes)
         )
         self._get_sediment_thickness_by_class()
@@ -1109,7 +1114,7 @@ class GravelBedrockEroder(Component):
         self._calc_tau_star()
         self._calc_tau_star_c()
 
-        self._excess_stress = self._tau_star - self._tau_star_c
+        self._excess_stress[:] = self._tau_star - self._tau_star_c
         self._excess_stress[self._excess_stress < 0] = 0
 
         # Get sediment flux
@@ -1134,8 +1139,8 @@ class GravelBedrockEroder(Component):
         return out
     def _calc_weight_threshold_to_deliv(self):
         """Calc minimal weight threshold to deliver"""
-        d_max = np.max(self._grid.at_node['grains_classes__size'])
-        self._weight_threshold_to_deliv = d_max * self._rho_sed * self._porosity_factor
+        d_max = np.min(self._grid.at_node['grains_classes__size'])
+        self._weight_threshold_to_deliv = d_max * self._rho_sed * (1-self._sediment_porosity)
 
     def calc_bedrock_plucking_rate(self):
         """Update the rate of bedrock erosion by plucking.
@@ -1147,35 +1152,66 @@ class GravelBedrockEroder(Component):
 
         Examples
         --------
-        # >>> import numpy as np
-        # >>> from landlab import RasterModelGrid
-        # >>> from landlab.components import FlowAccumulator
-        # >>> grid_res = 100.0
-        # >>> grid = RasterModelGrid((3, 3), xy_spacing=grid_res)
-        # >>> elev = grid.add_zeros("topographic__elevation", at="node")
-        # >>> elev[4] = 1.0
-        # >>> sed = grid.add_zeros("soil__depth", at="node")
-        # >>> fa = FlowAccumulator(grid)
-        # >>> fa.run_one_step()
-        # >>> eroder = GravelBedrockEroder(grid)
-        # >>> eroder.calc_rock_exposure_fraction()
-        # >>> eroder.calc_bedrock_plucking_rate()
-        # >>> predicted_plucking_rate = 1.0e-6 * 1.0e4 * 0.01 ** (7.0 / 6.0) / grid_res
-        # >>> round(predicted_plucking_rate, 9)  # Kp Q S^(7/6)
-        # 4.64e-07
-        # >>> int(round(eroder._pluck_rate[4] * 1e9))
-        464
+        >>> from landlab import RasterModelGrid
+        >>> from landlab.components import FlowAccumulator
+        >>> from soil_grading import SoilGrading
+        >>> xy_spacing=100
+        >>> grid = RasterModelGrid((3, 4), xy_spacing=xy_spacing)
+        >>> elev = grid.add_zeros("topographic__elevation", at="node")
+        >>> sed_depth = 1000
+        >>> porosity=0.5
+        >>> sed_weight = sed_depth * xy_spacing * xy_spacing * 2650 * (1-porosity)
+        >>> grains_weight =[sed_weight, sed_weight, sed_weight]
+        >>> grain_sizes = [0.001, 0.01, 0.05]
+        >>> sg = SoilGrading(grid,
+        ...         meansizes=grain_sizes,
+        ...         grains_weight=grains_weight,
+        ...         phi=porosity)
+        >>> fa = FlowAccumulator(grid)
+        >>> fa.run_one_step()
+        >>> eroder = GravelBedrockEroder(grid, abrasion_coefficients=[1], plucking_coefficient=[1])
+        >>> eroder._channel_width[:] = 1
+        >>> eroder._intermittency_factor = 0.1
+        >>> eroder._rock_exposure_fraction[:] = 1
+        >>> eroder._excess_stress[:] = 1
+        >>> eroder._flow_link_length_over_cell_area = 1
+        >>> eroder.calc_bedrock_plucking_rate()
+        >>> print(round(eroder._pluck_rate[grid.core_nodes[0]],1))
+        0.1
         """
 
         cores = self._grid.core_nodes
-        self._pluck_rate[cores] = (self._intermittency_factor *
-            self._plucking_coef[cores] *
-            self._excess_stress[cores]**(1.5) *
-            self._channel_width[cores]*
-            self._flow_link_length_over_cell_area *
-            self._rock_exposure_fraction[cores])
+        # self._pluck_rate[cores] = (self._intermittency_factor *
+        #     self._plucking_coef[cores] *
+        #     self._excess_stress[cores,1]**(1.5) *
+        #     self._channel_width[cores]*
+        #     self._flow_link_length_over_cell_area *
+        #     self._rock_exposure_fraction[cores])
 
+        classes_fractions = self._get_classes_fractions()
+        _calc_pluck_rate(self._n_classes,
+                         self.grid.number_of_core_nodes,
+                         self._intermittency_factor,
+                         self._flow_link_length_over_cell_area,
+                         self._grid.core_nodes,
+                         self._plucking_coef,
+                         self._channel_width,
+                         self._rock_exposure_fraction,
+                         classes_fractions,
+                         self._excess_stress,
+                         self._pluck_rate)
 
+    def _get_classes_fractions(self):
+
+        out = np.zeros(
+            (self._grid.number_of_nodes, self._n_classes)
+        )
+        classes_fractions = _get_classes_fractions(self._n_classes,
+                              self.grid.number_of_core_nodes,
+                              self._grid.core_nodes,
+                              self._grid.at_node['grains__weight'],
+                              out)
+        return classes_fractions
 
 
     def calc_sediment_influx(self):
@@ -1572,7 +1608,7 @@ class GravelBedrockEroder(Component):
         self._sed_influxes.fill(0.0)
         self._sed_outfluxes.fill(0.0)
         self._rock_exposure_fraction.fill(0.0)
-
+        self._excess_stress.fill(0.0)
 
     def run_one_step(self, global_dt):
         """Advance solution by time interval global_dt, subdividing
@@ -1585,6 +1621,17 @@ class GravelBedrockEroder(Component):
             this_dt = max(this_dt, _DT_MAX)
             self._update_rock_sed_and_elev(this_dt)
             time_remaining -= this_dt
+
+
+
+
+if __name__ == '__main__':
+    from soil_grading import SoilGrading
+    import doctest
+    doctest.testmod(name='calc_rock_exposure_fraction')
+
+
+
 
 
 
