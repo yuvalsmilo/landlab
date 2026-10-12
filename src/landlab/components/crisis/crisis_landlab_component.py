@@ -14,7 +14,9 @@
 #             Prof. Dimitrios Zekkos
 #             University of California, Berkeley
 #             zekkos@berkeley.edu
-#
+#   
+#   Code written and reviewed also by Yuval Shmilovitz (yuval.shmilovich@mail.huji.ac.il)
+        
 # =============================================================================
 
 
@@ -33,7 +35,7 @@ from landlab import Component, RasterModelGrid
 Gamma_W = 9.81
 
 # pull in the actual physics/math functions from the core CRISIS module
-from _crisis_core import (
+from ._crisis_core import (
     _build_upslope_map,
     _find_triggering_cells_vectorized,
     Determine_Pseudo_3D_landslides,

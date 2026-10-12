@@ -149,7 +149,7 @@ def load_h5(file_path):
     Examples
     --------
     >>> import h5py, numpy as np, tempfile, os
-    >>> from Scripts._crisis_core import load_h5
+    >>> from landlab.components.crisis._crisis_core import load_h5
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import load_h5
     >>> path = os.path.join(tempfile.mkdtemp(), "demo.h5")
@@ -183,7 +183,7 @@ def pad_rows(data):
 
     Examples
     --------
-    >>> from Scripts._crisis_core import pad_rows
+    >>> from landlab.components.crisis._crisis_core import pad_rows
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import pad_rows
     >>> pad_rows([[1, 2, 3], [4, 5]])
@@ -220,7 +220,7 @@ def T_UpGrid(FD_Mat, indID):
     drain into it (D8 codes: 4=S, 1=E, 16=W, 64=N flowing toward the center):
 
     >>> import numpy as np
-    >>> from Scripts._crisis_core import T_UpGrid
+    >>> from landlab.components.crisis._crisis_core import T_UpGrid
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import T_UpGrid
     >>> FD_Mat = np.array([
@@ -285,7 +285,7 @@ def _build_upslope_map(FD_Mat):
     the center cell (index 4) drains into it:
 
     >>> import numpy as np
-    >>> from Scripts._crisis_core import _build_upslope_map
+    >>> from landlab.components.crisis._crisis_core import _build_upslope_map
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import _build_upslope_map
     >>> FD_Mat = np.array([
@@ -446,7 +446,7 @@ def Determine_Pseudo_3D_landslides(Elev_Mat, Trig_Cells, Area_Mat, Slope_Mat,
     plane geometry along the way makes its computed depth negative.
 
     >>> import numpy as np
-    >>> from Scripts._crisis_core import Determine_Pseudo_3D_landslides
+    >>> from landlab.components.crisis._crisis_core import Determine_Pseudo_3D_landslides
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import Determine_Pseudo_3D_landslides
     >>> Elev_Mat  = np.array([[0.0, 2.0, 4.0, 6.0, 8.0]])
@@ -730,7 +730,7 @@ def Compute_Fs_vector(Strength_status, c, Phi, Theta_s, Theta_r,
     (zero pore pressure) soil strength.
 
     >>> import numpy as np
-    >>> from Scripts._crisis_core import Compute_Fs_vector
+    >>> from landlab.components.crisis._crisis_core import Compute_Fs_vector
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import Compute_Fs_vector
     >>> depths = np.array([1.0, 2.0, 3.0])
@@ -834,7 +834,7 @@ def Rupture_Dist(x_2d, y_2d, z_2d, corners):
     perpendicular distance); another is 300 m west of it.
 
     >>> import numpy as np
-    >>> from Scripts._crisis_core import Rupture_Dist
+    >>> from landlab.components.crisis._crisis_core import Rupture_Dist
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import Rupture_Dist
     >>> x_2d = np.array([[500.0, -300.0]])
@@ -986,7 +986,7 @@ def _compute_Sa_vec(Ts_13, M, R_2D):
     M7.0 earthquake, at rupture distances of 10 and 20 km:
 
     >>> import numpy as np
-    >>> from Scripts._crisis_core import _compute_Sa_vec
+    >>> from landlab.components.crisis._crisis_core import _compute_Sa_vec
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import _compute_Sa_vec
     >>> R_2D = np.array([[10.0, 20.0]])
@@ -1145,7 +1145,7 @@ def _find_triggering_cells_vectorized(
     cell (1, 1) is excluded for having a NaN (no-data) elevation.
 
     >>> import numpy as np
-    >>> from Scripts._crisis_core import _find_triggering_cells_vectorized
+    >>> from landlab.components.crisis._crisis_core import _find_triggering_cells_vectorized
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import _find_triggering_cells_vectorized
     >>> Elev_Mat  = np.array([[100.0, 90.0], [80.0, np.nan]])
@@ -1574,7 +1574,7 @@ def Modeled_landslides_shapefiles(FID_all_times, Cell_size, x, y, t,
     temporary directory and read back to confirm the shapefile is correct:
 
     >>> import numpy as np, geopandas as gpd, tempfile, os
-    >>> from Scripts._crisis_core import Modeled_landslides_shapefiles
+    >>> from landlab.components.crisis._crisis_core import Modeled_landslides_shapefiles
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import Modeled_landslides_shapefiles
     >>> FID_all_times = np.array([
@@ -1670,7 +1670,7 @@ def _save_individual_excel(state, output_dir):
     padded with NaN, while the "Cumulative" sheet accumulates over time.
 
     >>> import pandas as pd, tempfile, os
-    >>> from Scripts._crisis_core import _save_individual_excel
+    >>> from landlab.components.crisis._crisis_core import _save_individual_excel
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import _save_individual_excel
     >>> state = {
@@ -1756,7 +1756,7 @@ def _save_summary_excel(state, output_dir, c, Phi):
     Examples
     --------
     >>> import numpy as np, pandas as pd, tempfile, os
-    >>> from Scripts._crisis_core import _save_summary_excel
+    >>> from landlab.components.crisis._crisis_core import _save_summary_excel
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import _save_summary_excel
     >>> state = {
@@ -1852,7 +1852,7 @@ def predict_landslides_at_one_time_point(t, params, data, state, log):
     (`Triggering_Indicator=1`) and the constant-Ru pore-pressure model.
 
     >>> import numpy as np, tempfile, os
-    >>> from Scripts._crisis_core import predict_landslides_at_one_time_point, _build_upslope_map
+    >>> from landlab.components.crisis._crisis_core import predict_landslides_at_one_time_point, _build_upslope_map
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import predict_landslides_at_one_time_point, _build_upslope_map
     >>> outdir = tempfile.mkdtemp()
@@ -2165,7 +2165,7 @@ def run_model(params, log_callback=print):
     input files (as CRISIS is normally run), with rainfall-only triggering.
 
     >>> import numpy as np, h5py, tempfile, os
-    >>> from Scripts._crisis_core import run_model
+    >>> from landlab.components.crisis._crisis_core import run_model
     >>> # After creating a pull request, replace the import above with:
     >>> # from landlab.components.Crisis._crisis_core import run_model
     >>> outdir = tempfile.mkdtemp()
