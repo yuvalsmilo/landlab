@@ -375,6 +375,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -731,6 +732,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -968,6 +970,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1005,6 +1008,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1042,6 +1046,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1079,6 +1084,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1124,6 +1130,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1182,6 +1189,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1230,6 +1238,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1293,6 +1302,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1422,6 +1432,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1543,6 +1554,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1650,6 +1662,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1794,6 +1807,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1846,6 +1860,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)
@@ -1891,6 +1906,7 @@ class CrisisComponent(Component):
         >>> from landlab import RasterModelGrid
         >>> from landlab.components import FlowAccumulator
         >>> from landlab.components import CrisisComponent
+        >>> from landlab.components.crisis import build_parameters
         >>> nrows, ncols = 3, 100
         >>> dx = 1.0  # grid spacing (m)
         >>> grid = RasterModelGrid((nrows, ncols), xy_spacing=dx)

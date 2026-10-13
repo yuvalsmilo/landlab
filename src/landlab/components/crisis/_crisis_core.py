@@ -732,7 +732,6 @@ def Compute_Fs_vector(Strength_status, c, Phi, Theta_s, Theta_r,
     >>> import numpy as np
     >>> from landlab.components.crisis._crisis_core import Compute_Fs_vector
     >>> # After creating a pull request, replace the import above with:
-    >>> # from landlab.components.Crisis._crisis_core import Compute_Fs_vector
     >>> depths = np.array([1.0, 2.0, 3.0])
     >>> P = np.zeros(3)
     >>> theta = np.zeros(3)
